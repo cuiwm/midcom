@@ -1,0 +1,340 @@
+<html>
+<head>
+<title>NAT Check</title>
+</head>
+<body>
+
+<center>
+<h1>NAT Check</h1>
+<h2><i>Version 3, with  UDP and TCP support</i></h2>
+<h2>Check Your Network Address Translator <br>
+for Compatibility with Peer-to-Peer Protocols</h2>
+<h3>NAT Check by <a href="http://www.brynosaurus.com/">Bryan Ford</a>,
+web magic by <a href="http://www.angio.net/">Dave Andersen</a></h3>
+<h3>
+Hosted by
+<a href="http://www.sourceforge.net/projects/midcom-p2p">
+the MIDCOM-P2P project</a>
+on <a href="http://www.sourceforge.net">SourceForge</a>
+</center>
+
+<b><i>This page, the NAT servers, and the results database
+are no longer being actively maintained.</b></i>
+(Sorry, just no time; I have to focus on other projects now!)
+For a detailed overview of P2P hole punching techniques
+for both TCP and UDP,
+as well as some compatibility statistics generated using NAT Check,
+please see my USENIX '05 paper:
+
+<blockquote>
+	<b>Peer-to-Peer Communication Across Network Address Translators</b>,
+	<a href="http://www.brynosaurus.com/">Bryan Ford</a>,
+	Pyda Srisuresh, and <a href="http://www.kegel.com/">Dan Kegel</a>.
+	USENIX, April 2005.
+	<a href="http://www.brynosaurus.com/pub/net/p2pnat.pdf">PDF</a>
+	<a href="http://www.brynosaurus.com/pub/net/p2pnat.ps.gz">PS</a>
+	<a href="http://www.brynosaurus.com/pub/net/p2pnat/">HTML</a>.
+	<a href="p2pnat.bib">(BibTeX)</a>
+</blockquote>
+
+<p>
+You can still find the NAT Check code below,
+but to use it you'll have to run your own set of servers
+and modify the code to point to those servers.
+Note that the "natbouncer" program the page incorrectly mentioned for a while
+is actually just part of the "natserver" program now:
+just run "natserver 1" and "natserver 2" on the primary servers,
+and run "natserver 3" on the third ("bouncer") server .
+
+<p>
+You may also wish to check out the following related papers by others:
+
+<ul>
+<li>	<a href="http://sparrow.ece.cmu.edu/~adrian/projects/natblaster.pdf">
+	NATBLASTER: Establishing TCP Connections Between Hosts Behind NATs</a>,
+	Andrew Biggadike, Daniel Ferullo, Geoffrey Wilson, Adrian Perrig.
+	ACM SIGCOMM ASIA Workshop, April 2005.
+<li>	<a href="http://nutss.gforge.cis.cornell.edu/pub/imc05-tcpnat.pdf">
+	Characterization and Measurement of TCP Traversal through NATs
+	and Firewalls</a>,
+	Saikat Guha and Paul Francis.
+	Interet Measurement Conference (IMC), Oct 2005.
+</ul>
+
+<hr>
+<i>(old page starts here)</i>
+
+<h1>Introduction</h1>
+
+<p>
+If you are accessing the Internet from behind a
+Network Address Translator (NAT) of some kind,
+I would appreciate your help in surveying the behavior of different NATs,
+in terms of how and whether they support a certain technique
+for enabling peer-to-peer communication between NATted hosts
+(particularly when <i>both</i> endpoints are behind NATs).
+See below for a brief technical summary of the technique
+and the properties of a NAT tested by NAT Check.
+For an extended discussion of this technique and related issues,
+please read
+<a href="http://www.brynosaurus.com/pub/net/draft-ford-midcom-p2p-03.txt">
+my Internet Draft on the topic</a>.
+(Comments and feedback are greatly appreciated!)
+<b>Note:</b> this draft does NOT yet include a discussion
+of the new TCP-based NAT P2P hole punching technique
+that version 3 of NAT Check tests for.
+A new version of teh Internet-Draft should be available shortly.
+
+<p>
+To participate, please download,
+compile, and run this trivial C program on your system:
+<a href="natcheck.c">natcheck.c</a>.
+(If you are on a 64-bit machine,
+then either add "-DHAVE_STDINT" to your compile command line
+or edit the #define's toward the beginning appropriately.)
+Alternatively, if you are the trusting type,
+the following pre-compiled binaries are available:
+<ul>
+<li>	<a href="natcheck-linux">Linux-x86</a>,
+	md5sum 5b4b7c1f5e7f37c66ff4500431bfffcd.
+<li>	<a href="natcheck-freebsd">FreeBSD-x86</a>,
+	md5sum 7daef2cd6ec398d3d025aa61e270a383.
+<li>	<a href="natcheck.exe">Win32-x86</a>,
+	md5sum 1cf715d6d8d4d4f168d34b9c4421c627.
+	(Thanks to Philippe Verdy for this port!)
+</ul>
+
+Still at version 2, needs updating:
+<ul>
+<li>	<a href="natcheck-macosx">Mac OS X</a>,
+	md5sum 8dc2d9e814909e319be9d7e63000485b.
+	(Thanks to Richard Elmore for this port!)
+	<a href="http://bleu.west.spy.net/~dustin/projects/natcheck.xtp">
+	GUI by Dustin Sallings</a>
+</ul>
+
+<p>
+Then run the <b>natcheck</b> program and
+<a href="http://bgp.lcs.mit.edu/~dga/submit.cgi">submit the results here</a>.
+You can view the accumulated results
+<a href="http://bgp.lcs.mit.edu/~dga/view.cgi">at this page</a>.
+<i>(Sorry, these no longer work - I'll try to recover and post a
+final snapshot of the database when I can.)</i>
+
+<p>Thank you very much for your help!
+<p>- Bryan
+
+<hr>
+<center>
+<h2>Technical Explanation</h2>
+</center>
+
+<p>
+This technique is fairly simple,
+has been pointed out before 
+(e.g., <a href="http://www.alumni.caltech.edu/~dank/peer-nat.html">here</a>
+and <a href="http://www.peer-to-peerwg.org/tech/nat/">here</a>),
+and has been implemented
+in a variety of on-line games and other peer-to-peer applications.
+The purpose of this page is mainly to draw more attention to the technique
+and to discover how widely compatible the technique is with current NATs.
+
+<h3>The Technique</h3>
+
+<p>
+Suppose there are three communicating hosts: A, B, and C.
+Host A is a "well-known" Internet server with a permanent IP address,
+which acts as an "introducer" for the other two nodes.
+(For example, Host A might be a well-known ultrapeer
+or a game catalog server of some kind.)
+Host B, using Host A's "introduction" services, would like to establish
+a direct peer-to-peer connection with host C.
+Both B and C, however, are behind (probably different)
+network address/port translators,
+and neither of them has exclusive use of any public IP address.
+
+<p>
+To initiate a peer-to-peer connection with host C,
+host B first sends A a message requesting an "introduction" to host C.
+A sends B a reply message containing C's IP address and UDP port number
+<i>as reported by host C</i>,
+in addition to C's IP address and UDP port number
+<i>as observed by A</i>.
+(If C is behind a NAT, then these two address/port combinations
+will be different.)
+At the same time, host A sends host C a message
+containing B's IP address and UDP port numbers -
+again, both the ones reported by B
+and the ones observed by A,
+which will be different if B is behind a NAT.
+
+<p>
+Now B and C each know that they want to initiate a connection with each other,
+and they know each other's public (NATted)
+as well as original IP addresses and UDP port numbers.
+Both B and C now start attempting to send UDP messages directly to each other,
+at each of the available addresses.
+If B and C happen to be behind <i>the same</i> NAT,
+then they will be able to communicate with each other directly
+using their "originally reported" IP addresses and UDP port numbers.
+
+<p>
+In the more common case where B and C are behind <i>different</i> NATs,
+the "originally reported" addresses will be useless
+because they will both be private IP addresses in different addressing domains.
+Instead, the IP address/UDP port combinations observed by A
+can be used in this case to establish direct communication.
+Although B's NAT will initially filter out any UDP packets
+arriving from C's public (NATted) UDP port directed at B's public port,
+the first UDP message B sends to C will cause B's NAT
+to open up a new UDP session keyed on C's public port,
+allowing future incoming traffic from C to pass through the NAT to B.
+Similarly, the first few messages from B to C
+may be filtered out by C's NAT,
+but will be able to start passing through the firewall
+as soon as C's first message to B causes C's NAT to open up a new session.
+In this way,
+each NAT is tricked into thinking that <i>its</i> respective internal host
+is the "initiator" of this new session,
+when in fact the session is fully symmetrical
+and was initiated (with A's help) simultaneously in each direction.
+
+<h3>Required NAT Behavior</h3>
+
+<p>
+There is one important requirement that the NATs must satisfy
+in order for this technique to work:
+the NATs must be designed so that they assign
+only one (public IP address, public UDP port) pair
+to each (internal IP address, internal UDP port) combination,
+rather than allocating and assigning a new public UDP port
+for each new UDP <i>session</i>.
+Recall that a "session" in Internet terminology
+is defined by the IP addresses and port numbers
+of <i>both</i> communicating endpoints,
+so host B's communication with host A is considered to be one session
+while host B's communication with host C is a different session.
+If B's NAT, for example,
+assigns one public UDP port for B's communication with A,
+and then assigns B a <i>different</i> public UDP port
+for the new session B tries to open up with C,
+then the above technique for peer-to-peer communication
+will not work because C's messages to B will be directed to the wrong UDP port.
+
+<p>
+RFC 3022 explicitly allows and suggests that NATs behave
+in the former, "desirable" fashion,
+by maintaining a single (public IP, public port) mapping
+for a given (internal IP, internal port) combination
+independent of the number of active sessions involving this mapping.
+This behavior is not only good for compatibility with UDP applications,
+but it also helps to conserve the NAT's scarce pool of public port numbers.
+Maintaining a consistent public port mapping
+does not adversely affect security in any way, either,
+because incoming traffic can still be <i>filtered</i>
+on a per-session basis regardless of how addresses are <i>translated</i>.
+There in fact appears to be no good reason <i>not</i>
+to implement the desirable behavior in a NAT,
+except perhaps for the implementation simplicity
+of naively allocating a new public port for every new session.
+Unfortunately, RFC 3022 does not <i>require</i> NATs
+to implement the desirable behavior,
+which has led me to wonder just how many real NATs actually do,
+and hence this page.
+
+<h3>What NAT Check Does</h3>
+
+The program <a href="natcheck.c">natcheck.c</a>
+is basically just a program that "pings" a well-known UDP port
+at two different servers that are publically accessible on the Internet.
+Both of these servers run the program
+<a href="natserver.c">natserver.c</a>,
+with the command-line arguments "1" and "2" respectively.
+In addition, there a third "conspiring" server
+runs natserver with the command-line argument "3".
+Whenever each of the first two servers receives a UDP request,
+it not only sends a reply directly to the sender of that request,
+but also sends a message to the third server,
+which in turn "bounces" the reply back to the original client.
+The effect is that the client will receive not only solicited "ping" replies
+from the server the request was directed to,
+but also "unsolicited" replies from the third server.
+
+<p>
+To determine if the network address translator in use
+is implementing the desirable behavior
+of maintaining a single (public IP address, public port) mapping
+for a given (client IP address, client port),
+the client program <a href="natcheck.c">natcheck.c</a>
+basically just initiates a sequence of simultaneous pings
+to the first two servers
+(in case some of the requests or replies are lost in transit)
+and checks that the client's address and UDP port
+as reported by both servers is the same.
+If the NAT naively allocates a new public port for each new session,
+then the source port as reported by the two servers will be different,
+and it's time to upgrade your NAT.
+
+<p>
+The replies echoed from the third server
+are used only to check whether the NAT
+properly filters out unsolicited incoming traffic on a per-session basis.
+Since the client never sends any messages to the third server,
+if the NAT is properly implementing firewall functionality,
+the client should never see the third server's echoed replies
+even after opening up active communication sessions with the first two servers.
+
+<h3>Changes in Version 2</h3>
+
+Version 2 of NAT Check contains the following enhancements:
+
+<ul>
+<li>	The NAT Check client no longer attempts to guess
+	whether you have Basic NAT or Network Address/Port Translation (NAPT).
+	It turns to be quite difficult to test for this property reliably,
+	because many NAPTs attempt to bind a private UDP port
+	to a public port with the same port number
+	if that port number is available,
+	causing NAT Check to falsely report Basic NAT.
+	The only way to test for this property reliably
+	would be to run NAT Check
+	on at least two client machines simultaneously,
+	and since this property isn't terribly important to P2P apps
+	it's just not worth the trouble.
+
+<li>	The NAT Check client now tests for one additional NAT feature,
+	which I call <i>loopback translation</i>.
+	If a NAT supports loopback translation,
+	it means that a host on the private network behind the NAT
+	can communicate with other hosts on the same private network
+	<i>using public (translated) port bindings assigned by the NAT</i>.
+	Most NATs probably do not support this feature yet,
+	but it may become increasingly important in the future
+	where P2P clients may be located behind a common ISP-deployed NAT
+	as well as individual home NATs.
+	More details on loopback translation will appear
+	in the next version of my Internet-Draft, to be released soon.
+
+<li>	The NAT Check client program now has a command-line option, "-v",
+	which turns on verbose messages during the test.
+</ul>
+
+<h3>Related Links</h3>
+
+<ul>
+<li>	<a href="http://www.brynosaurus.com/pub/net/p2pnat/">
+	USENIX '05 paper on P2P over NAT</a>
+<li>	<a href="http://nutss.gforge.cis.cornell.edu/">
+	NUTSS project at Cornell</a>
+<li>	<a href="http://www.alumni.caltech.edu/~dank/peer-nat.html">
+	Dan Kegel's NAT/P2P page</a>
+<li>	<a href="http://www.ietf.org/html.charters/behave-charter.html">
+	IETF BEHAVE working group</a>
+<li>	<a href="http://www.ietf.org/html.charters/midcom-charter.html">
+	IETF MIDCOM working group</a>
+<li>	<a href="http://groups.yahoo.com/group/nat-peer-games/">
+	nat-peer-games group on Yahoo!</a>
+</ul>
+
+</body>
+</html>
